@@ -46,7 +46,8 @@ class Base_TF_Model(nn.Module):
         self.n_fft = n_fft
         self.win_length = win_length
         self.hop_length = hop_length
-        self.window = torch.hann_window(self.win_length).cuda()
+        window = torch.hann_window(self.win_length)
+        self.register_buffer("window", window)
         self.spec_factor = spec_factor
         self.spec_abs_exponent = spec_abs_exponent
         self.transform_type = transform_type

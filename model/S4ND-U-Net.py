@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from einops import rearrange, reduce
 
 from model.DSSM_modules.s4nd import (
     S4ND,
@@ -15,6 +16,49 @@ from model.base_SE_model import Base_TF_Model
 from util.dsp import convert_to_different_features
 
 
+class DummyResidual(nn.Module):
+
+    def __init__(
+        self,
+        d_model,
+        layer,
+        dropout=0.0,
+        ff_bottleneck_expand_factor=1,
+    ):
+        super().__init__()
+        self.layer = layer
+        self.norm = nn.Identity()
+
+    def forward(self, x):
+        z = x
+        z = rearrange(z, "... d h w -> ... h w d")
+        z = self.norm(z)
+        z = rearrange(z, "...  h w d-> ... d h w")
+        z = self.layer(z)
+        x = z + x
+        return x
+
+
+class DummyFF(nn.Module):
+
+    def __init__(
+        self,
+        d_model,
+        ff_bottleneck_expand_factor=1,
+        dropout=0.0,
+    ):
+        super().__init__()
+
+    def forward(self, x):
+        return x
+
+
+# ResidualBlock2D = DummyResidual
+# FFBlock2D = DummyFF
+# TransposedLN = nn.Identity
+# S4ND = nn.Identity
+
+
 class backbone(nn.Module):
     def __init__(
         self,
@@ -24,7 +68,7 @@ class backbone(nn.Module):
         n_layers_per_block=4,
         time_resample_factor=2,
         ff_bottleneck_expand_factor=2,
-        bidirectional=True,
+        bidirectional=False, # False == causal
         unet=True,
         dropout=0.0,
     ):
