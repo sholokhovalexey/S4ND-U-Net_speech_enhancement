@@ -28,7 +28,11 @@ def inference(
     model_cls=S4ND,
 ):
 
-    *dims_spatial, length = data_shape
+    if model_cls == S4:
+        assert len(*data_shape) == 3
+
+    # unpack shape of an input tensor
+    *dims_spatial, length = data_shape  # shape = (... spatial dims ..., time dim)
 
     kernel_args = {
         "mode": "diag",
@@ -85,14 +89,14 @@ def inference(
     H = d_model
     # N = d_state // 2 # state size
 
-    # input
+    # input sequence and an initial state
     if isinstance(model, S4):
         if transposed:
-            x = 1.0 * torch.randn(batch_size, H, length)
+            x = torch.randn(batch_size, H, length)
         else:
-            x = 1.0 * torch.randn(batch_size, length, H)
+            x = torch.randn(batch_size, length, H)
         state = model.default_state(batch_size)
-        state = torch.randn_like(state) * 10
+        state = torch.randn_like(state)
 
     elif isinstance(model, S4ND):
         if transposed:
@@ -100,10 +104,7 @@ def inference(
         else:
             x = torch.randn(batch_size, *dims_spatial, length, H)
         state = model.default_state(batch_size, *dims_spatial)
-        state = torch.randn_like(state) * 10
-
-    # recurrent mode
-    state_recur = state.clone()
+        state = torch.randn_like(state)
 
     with torch.no_grad():
 
@@ -113,26 +114,24 @@ def inference(
         # recurrent mode
         model.setup_step()  # call before recurrence
 
-        y_recur = []
+        state_recur = state.clone()
+
+        y_recur = []  # output sequence
         for i in range(length):
             if transposed:
-                x_i = x[..., i]
+                x_i = x[..., i]  # last dim is time
             else:
                 x_i = x[..., i, :]
 
             y_i, state_recur = model.step(x_i, state_recur)
-
-            if transposed:
-                y_recur.append(y_i.unsqueeze(-1))
-            else:
-                y_recur.append(y_i.unsqueeze(-2))
+            y_recur.append(y_i)
 
         if transposed:
-            y_recur = torch.cat(y_recur, -1)
+            y_recur = torch.cat([y_i.unsqueeze(-1) for y_i in y_recur], -1)
         else:
-            y_recur = torch.cat(y_recur, -2)
+            y_recur = torch.cat([y_i.unsqueeze(-2) for y_i in y_recur], -2)
 
-        # compute the relative differences between outputs of the conv and recu
+        # compute the relative differences between outputs from the conv and recurrent modes
         eps = 1e-16
         rdif = lambda a, b: torch.norm(a - b) / (torch.norm(b) + eps)
 
@@ -222,8 +221,10 @@ def test_inference(d_model, d_state, data_shape, bidirectional, transposed, line
 
     if default_dtype == torch.float32:
         max_diff = 1e-4
-    else:
+    elif default_dtype == torch.float64:
         max_diff = 1e-13
+    else:
+        raise ValueError(f"No support for {default_dtype}, use float or double.")
 
     assert diff_out < max_diff
     assert diff_state < max_diff

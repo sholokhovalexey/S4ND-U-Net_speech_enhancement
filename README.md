@@ -14,9 +14,9 @@ python S4ND-U-Net.py
 
 ```
 
-### UPDATE
+### ❗ UPDATE ❗
 
-This repo is a MODIFIED version of the original repo. In short, the new version supports updating the state for the S4ND model that allows eliminating the following code line:
+This repo is a MODIFIED version of the original repo. In short, the new version supports updating the state for the S4ND model that allows eliminating the following [code line](https://github.com/Kuray107/S4ND-U-Net_speech_enhancement/blob/main/model/DSSM_modules/s4nd.py#L226):
 ```
 assert state is None, f"state not currently supported in S4ND"
 ```
@@ -30,6 +30,8 @@ Run tests
 pytest -q test_inference.py
 
 ```
+
+**TODO**: implement recurrent inference for the full `S4ND_U_Net` model.
 
 ### Reference
 
